@@ -138,7 +138,7 @@ class ErrorTests(unittest.TestCase):
         engine = CalculatorEngine()
         engine.handle_key("4")
         engine.handle_key("*")
-        self.assertEqual(engine.handle_key("-"), "Error")
+        self.assertEqual(engine.handle_key("+"), "Error")
 
     def test_errors_do_not_raise_and_can_be_cleared(self) -> None:
         engine = _press("8/0=")
@@ -165,6 +165,72 @@ class ErrorTests(unittest.TestCase):
         self.assertEqual(engine.input_digit("a"), "Error")
         self.assertEqual(engine.input_operator("%"), "Error")
         self.assertEqual(engine.handle_key("c"), "0")
+
+
+class UnaryMinusTests(unittest.TestCase):
+    def test_sign_after_an_operator(self) -> None:
+        cases = {
+            "5*-3=": "-15",
+            "6/-2=": "-3",
+            "2--3=": "5",
+            "5+-3=": "2",
+            "4+-2*3=": "-2",
+            "8/-4/2=": "-1",
+            "5*-3*-2=": "30",
+            "5*-0.5=": "-2.5",
+            "2--.5=": "2.5",
+        }
+        for sequence, expected in cases.items():
+            with self.subTest(sequence=sequence):
+                self.assertEqual(_press(sequence).display(), expected)
+
+    def test_sign_is_shown_while_typing(self) -> None:
+        engine = CalculatorEngine()
+        self.assertEqual(engine.handle_key("5"), "5")
+        self.assertEqual(engine.handle_key("*"), "5 ×")
+        self.assertEqual(engine.handle_key("-"), "5 × -")
+        self.assertEqual(engine.handle_key("3"), "5 × -3")
+        self.assertEqual(engine.handle_key("="), "-15")
+
+        engine = CalculatorEngine()
+        for key in "2--3":
+            engine.handle_key(key)
+        self.assertEqual(engine.display(), "2 - -3")
+
+    def test_bare_sign_is_not_a_number(self) -> None:
+        engine = _press("5*-")
+        self.assertEqual(engine.display(), "5 × -")
+        self.assertEqual(engine.equals(), "Error")
+
+        engine = _press("5*-")
+        self.assertEqual(engine.handle_key("+"), "Error")
+
+        engine = CalculatorEngine()
+        engine.handle_key("6")
+        engine.handle_key("/")
+        engine.handle_key("-")
+        self.assertEqual(engine.handle_key("/"), "Error")
+
+    def test_backspace_removes_the_sign_then_the_operator(self) -> None:
+        engine = _press("5*-3")
+        self.assertEqual(engine.display(), "5 × -3")
+        self.assertEqual(engine.backspace(), "5 × -")
+        self.assertEqual(engine.backspace(), "5 ×")
+        self.assertEqual(engine.handle_key("3"), "5 × 3")
+        self.assertEqual(engine.equals(), "15")
+
+    def test_backspace_on_a_negative_result_keeps_the_sign(self) -> None:
+        engine = _press("5*-3=")
+        self.assertEqual(engine.display(), "-15")
+        self.assertEqual(engine.backspace(), "-1")
+        self.assertEqual(engine.backspace(), "-")
+        self.assertEqual(engine.backspace(), "0")
+
+    def test_leading_minus_is_subtraction_from_zero(self) -> None:
+        self.assertEqual(_press("-3=").display(), "-3")
+        engine = CalculatorEngine()
+        self.assertEqual(engine.handle_key("-"), "0 -")
+        self.assertEqual(engine.handle_key("3"), "0 - 3")
 
 
 class EditingTests(unittest.TestCase):
@@ -305,13 +371,37 @@ class ModuleBoundaryTests(unittest.TestCase):
         self.assertNotIn("exec", called)
 
     def test_package_import_does_not_import_tkinter(self) -> None:
+        # GUI tests in this process may already have imported tkinter.
+        # A fresh interpreter is the check that the package itself does not.
+        import os
+        import subprocess
         import sys
 
-        self.assertNotIn("tkinter", sys.modules)
-        import calculator
-
-        self.assertNotIn("tkinter", sys.modules)
-        self.assertIs(calculator.CalculatorEngine, CalculatorEngine)
+        root = Path(__file__).resolve().parents[1]
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(root), env.get("PYTHONPATH", "")]
+        ).rstrip(os.pathsep)
+        code = (
+            "import sys\n"
+            "import calculator\n"
+            "from calculator.engine import CalculatorEngine\n"
+            "assert 'tkinter' not in sys.modules\n"
+            "assert calculator.CalculatorEngine is CalculatorEngine\n"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            completed.returncode,
+            0,
+            completed.stderr or completed.stdout,
+        )
 
 
 if __name__ == "__main__":

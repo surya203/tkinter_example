@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+import tkinter.font as tkfont
 
 from calculator.engine import CalculatorEngine
 
@@ -10,6 +11,13 @@ _WINDOW_BG = "#d4d4d8"
 _DISPLAY_BG = "#111827"
 _DISPLAY_FG = "#f9fafb"
 _ERROR_FG = "#fca5a5"
+
+# Shown on the backspace key. The first one the button font can draw wins.
+# Some Tk builds fall back to "fixed", where Font.measure("⌫") is 0 and the
+# button looks blank; "DEL" is ASCII and stays visible there.
+_BACKSPACE_LABELS = ("⌫", "←", "DEL")
+_BUTTON_FONT = ("DejaVu Sans", 18)
+_DISPLAY_FONT = ("DejaVu Sans", 28)
 
 # (label, engine key, row, column, rowspan, colspan, role)
 _BUTTONS: tuple[tuple[str, str, int, int, int, int, str], ...] = (
@@ -71,20 +79,26 @@ class CalculatorApp:
             anchor="e",
             bg=_DISPLAY_BG,
             fg=_DISPLAY_FG,
-            font=("DejaVu Sans", 28),
+            font=_DISPLAY_FONT,
             padx=16,
             pady=20,
             width=14,
         )
         self._display.grid(row=0, column=0, columnspan=4, sticky="nsew", pady=(0, 12))
 
+        backspace_text = visible_text(
+            _BACKSPACE_LABELS,
+            tkfont.Font(self.root, font=_BUTTON_FONT).measure,
+        )
         for label, key, row, column, rowspan, colspan, role in _BUTTONS:
             bg, fg, active = _ROLE_COLORS[role]
+            if key == "BS":
+                label = backspace_text
             button = tk.Button(
                 frame,
                 text=label,
                 command=lambda k=key: self.press(k),
-                font=("DejaVu Sans", 18),
+                font=_BUTTON_FONT,
                 bg=bg,
                 fg=fg,
                 activebackground=active,
@@ -129,6 +143,24 @@ class CalculatorApp:
     def run(self) -> None:
         """Block in the tkinter main loop."""
         self.root.mainloop()
+
+
+def visible_text(candidates: tuple[str, ...], measure) -> str:
+    """First candidate with a positive width, or the last one if none do.
+
+    ``measure`` is ``tkinter.font.Font.measure``. A missing glyph often
+    measures 0, which leaves a button looking empty.
+    """
+    if not candidates:
+        return ""
+    for candidate in candidates:
+        try:
+            width = measure(candidate)
+        except tk.TclError:
+            width = 0
+        if width > 0:
+            return candidate
+    return candidates[-1]
 
 
 def _key_from_event(event: tk.Event) -> str | None:

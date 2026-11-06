@@ -5,7 +5,9 @@ Arithmetic lives in `calculator/engine.py`, which does not import tkinter and do
 
 Multiplication and division happen before addition and subtraction. Operators of the same rank run left to right. Results use `decimal.Decimal`, so `0.1 + 0.2` shows `0.3`.
 
-Divide by zero, a second decimal point in one number, or an operator where a number is required (a second operator in a row, or `=` before the next number) shows `Error`. The window stays open. Press `C`, `Esc`, or `c`, Backspace, or type a digit or `.` to continue.
+Divide by zero, a second decimal point in one number, or an operator where a number is required (`5 + +`, or `=` before the next number) shows `Error`. The window stays open. Press `C`, `Esc`, or `c`, Backspace, or type a digit or `.` to continue.
+
+A minus immediately after `+`, `-`, `×`, or `÷` is the sign of the next number: `5 × -3` is `-15`, `6 ÷ -2` is `-3`, and `2 - -3` is `5`. A leading minus is subtraction from zero, so `-3` is `-3`.
 
 ## Requirements
 
@@ -31,8 +33,10 @@ Type with the buttons or the keyboard: digits, `.`, `+`, `-`, `*`, `/`, `Enter` 
 
 ## Run the tests
 
-From the repository root. This does not open a window:
+From the repository root:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+Engine tests do not open a window. A few GUI smoke tests run when a display is available and skip otherwise.

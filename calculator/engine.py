@@ -82,7 +82,11 @@ class CalculatorEngine:
         return self.display()
 
     def input_operator(self, operator: str) -> str:
-        """Push ``+``, ``-``, ``*`` or ``/``. A second operator in a row is ``Error``."""
+        """Push ``+``, ``-``, ``*`` or ``/``.
+
+        A second operator in a row is ``Error``, except ``-`` after an
+        operator, which starts a negative number (``5 × -3``).
+        """
         try:
             self._operator(operator)
         except Exception:
@@ -171,8 +175,10 @@ class CalculatorEngine:
         if self._status != "entry" or self._entry is None:
             self._fail()
             return
-        if self._entry == "0":
-            self._entry = digit
+        if self._entry in {"0", "-0"}:
+            if digit == "0":
+                return
+            self._entry = f"-{digit}" if self._entry.startswith("-") else digit
             return
         if len(self._entry) >= _MAX_ENTRY_CHARS:
             return
@@ -189,6 +195,9 @@ class CalculatorEngine:
         if self._status != "entry" or self._entry is None:
             self._fail()
             return
+        if self._entry == "-":
+            self._entry = "-0."
+            return
         if "." in self._entry:
             self._fail()
             return
@@ -204,6 +213,11 @@ class CalculatorEngine:
         if self._status == "error":
             return
         if self._status == "operator":
+            # 5 × -3: the minus is the sign of the next number, not a second operator.
+            if operator == "-":
+                self._entry = "-"
+                self._status = "entry"
+                return
             self._fail()
             return
         if self._status == "idle":
@@ -212,6 +226,9 @@ class CalculatorEngine:
             number = self._result or "0"
             self._result = None
         elif self._status == "entry" and self._entry is not None:
+            if not _is_complete_number(self._entry):
+                self._fail()
+                return
             number = self._entry
             self._entry = None
         else:
@@ -225,6 +242,9 @@ class CalculatorEngine:
         if self._status in {"error", "idle", "result"}:
             return
         if self._status != "entry" or self._entry is None:
+            self._fail()
+            return
+        if not _is_complete_number(self._entry):
             self._fail()
             return
         tokens = [*self._expr, self._entry]
@@ -267,13 +287,24 @@ class CalculatorEngine:
             self._fail()
             return
         self._entry = self._entry[:-1]
-        if self._entry in {"", "-"}:
+        # A lone "-" is an in-progress negative number. Only a fully deleted
+        # entry returns to the previous operator (or to 0).
+        if self._entry == "":
             if self._expr:
                 self._entry = None
                 self._status = "operator"
             else:
                 self._entry = None
                 self._status = "idle"
+
+
+def _is_complete_number(text: str) -> bool:
+    """True when ``text`` is a finite decimal, not a bare sign or dot."""
+    try:
+        value = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return False
+    return value.is_finite()
 
 
 def _evaluate(tokens: list[str]) -> Decimal:
