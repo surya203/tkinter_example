@@ -29,7 +29,7 @@ python3 -m calculator
 
 `python -m calculator` is the same command when `python` already points at Python 3.
 
-Type with the buttons or the keyboard: digits, `.`, `+`, `-`, `*`, `/`, `Enter` or `=` for equals, Backspace, and `Esc` or `c` for clear.
+Type with the buttons or the keyboard: digits, `.`, `+`, `-`, `*`, `/`, `Enter` or `=` for equals, Backspace, and `Esc` or `c` for clear. The backspace button is labeled `DEL` so the caption stays readable when the font cannot draw a special glyph.
 
 ## Run the tests
 

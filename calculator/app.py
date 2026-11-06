@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import tkinter as tk
-import tkinter.font as tkfont
 
 from calculator.engine import CalculatorEngine
 
@@ -12,17 +11,15 @@ _DISPLAY_BG = "#111827"
 _DISPLAY_FG = "#f9fafb"
 _ERROR_FG = "#fca5a5"
 
-# Shown on the backspace key. The first one the button font can draw wins.
-# Some Tk builds fall back to "fixed", where Font.measure("⌫") is 0 and the
-# button looks blank; "DEL" is ASCII and stays visible there.
-_BACKSPACE_LABELS = ("⌫", "←", "DEL")
+# ASCII on purpose. "⌫" and "←" can measure as non-zero and still paint as a
+# missing-glyph box when Tk falls back to the "fixed" font.
 _BUTTON_FONT = ("DejaVu Sans", 18)
 _DISPLAY_FONT = ("DejaVu Sans", 28)
 
 # (label, engine key, row, column, rowspan, colspan, role)
 _BUTTONS: tuple[tuple[str, str, int, int, int, int, str], ...] = (
     ("C", "C", 1, 0, 1, 1, "clear"),
-    ("⌫", "BS", 1, 1, 1, 1, "back"),
+    ("DEL", "BS", 1, 1, 1, 1, "back"),
     ("÷", "/", 1, 2, 1, 1, "op"),
     ("×", "*", 1, 3, 1, 1, "op"),
     ("7", "7", 2, 0, 1, 1, "digit"),
@@ -86,14 +83,8 @@ class CalculatorApp:
         )
         self._display.grid(row=0, column=0, columnspan=4, sticky="nsew", pady=(0, 12))
 
-        backspace_text = visible_text(
-            _BACKSPACE_LABELS,
-            tkfont.Font(self.root, font=_BUTTON_FONT).measure,
-        )
         for label, key, row, column, rowspan, colspan, role in _BUTTONS:
             bg, fg, active = _ROLE_COLORS[role]
-            if key == "BS":
-                label = backspace_text
             button = tk.Button(
                 frame,
                 text=label,
@@ -143,24 +134,6 @@ class CalculatorApp:
     def run(self) -> None:
         """Block in the tkinter main loop."""
         self.root.mainloop()
-
-
-def visible_text(candidates: tuple[str, ...], measure) -> str:
-    """First candidate with a positive width, or the last one if none do.
-
-    ``measure`` is ``tkinter.font.Font.measure``. A missing glyph often
-    measures 0, which leaves a button looking empty.
-    """
-    if not candidates:
-        return ""
-    for candidate in candidates:
-        try:
-            width = measure(candidate)
-        except tk.TclError:
-            width = 0
-        if width > 0:
-            return candidate
-    return candidates[-1]
 
 
 def _key_from_event(event: tk.Event) -> str | None:

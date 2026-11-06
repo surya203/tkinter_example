@@ -7,14 +7,11 @@ import unittest
 
 try:
     import tkinter as tk
-    import tkinter.font as tkfont
 
-    from calculator.app import CalculatorApp, visible_text
+    from calculator.app import CalculatorApp
 except ImportError as exc:  # tkinter is optional for the headless engine tests
     tk = None
-    tkfont = None
     CalculatorApp = None
-    visible_text = None
     _IMPORT_ERROR = str(exc)
 else:
     _IMPORT_ERROR = ""
@@ -27,28 +24,6 @@ def _buttons(widget: tk.Misc) -> list[tk.Button]:
             found.append(child)
         found.extend(_buttons(child))
     return found
-
-
-class BackspaceLabelTests(unittest.TestCase):
-    def setUp(self) -> None:
-        if visible_text is None:
-            self.skipTest(f"tkinter is not installed ({_IMPORT_ERROR})")
-
-    def test_zero_width_glyphs_fall_back_to_del(self) -> None:
-        def measure(text: str) -> int:
-            return 0 if text in {"⌫", "←"} else 20
-
-        self.assertEqual(visible_text(("⌫", "←", "DEL"), measure), "DEL")
-
-    def test_first_drawable_glyph_is_kept(self) -> None:
-        self.assertEqual(visible_text(("⌫", "←", "DEL"), lambda text: 8), "⌫")
-        self.assertEqual(
-            visible_text(("⌫", "←", "DEL"), lambda text: 0 if text == "⌫" else 6),
-            "←",
-        )
-
-    def test_all_zero_widths_still_use_the_ascii_label(self) -> None:
-        self.assertEqual(visible_text(("⌫", "←", "DEL"), lambda text: 0), "DEL")
 
 
 class GuiSmokeTests(unittest.TestCase):
@@ -85,18 +60,16 @@ class GuiSmokeTests(unittest.TestCase):
         self.fail(f"no button labeled {text!r}")
         raise AssertionError
 
-    def test_backspace_label_has_nonzero_width(self) -> None:
+    def test_backspace_button_is_labeled_del(self) -> None:
         labels = {button.cget("text") for button in _buttons(self.root)}
         for text in "0123456789.+-=C":
             self.assertIn(text, labels)
-        self.assertTrue(labels & {"×", "÷"})
-        backspace = labels & {"⌫", "←", "DEL"}
-        self.assertEqual(len(backspace), 1)
-        label = next(iter(backspace))
-        button = self._button(label)
-        font = tkfont.Font(self.root, font=button.cget("font"))
-        self.assertGreater(font.measure(label), 0)
-        self.assertGreater(len(label.strip()), 0)
+        self.assertIn("×", labels)
+        self.assertIn("÷", labels)
+        self.assertIn("DEL", labels)
+        self.assertNotIn("⌫", labels)
+        self.assertNotIn("←", labels)
+        self.assertEqual(self._button("DEL").cget("text"), "DEL")
 
     def test_buttons_evaluate_with_precedence(self) -> None:
         for label in ("2", "+", "3", "×", "4", "="):
@@ -142,12 +115,7 @@ class GuiSmokeTests(unittest.TestCase):
     def test_backspace_button_deletes_a_digit(self) -> None:
         self._button("1").invoke()
         self._button("2").invoke()
-        backspace = next(
-            button
-            for button in _buttons(self.root)
-            if button.cget("text") in {"⌫", "←", "DEL"}
-        )
-        backspace.invoke()
+        self._button("DEL").invoke()
         self.assertEqual(self.app.engine.display(), "1")
 
 
